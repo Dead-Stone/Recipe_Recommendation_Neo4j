@@ -25,9 +25,9 @@ neo4j_password = os.getenv("NEO4J_PASSWORD")
 driver = GraphDatabase.driver(neo4j_uri, auth=(neo4j_username, neo4j_password))
 
 # Function to create a knowledge graph entry for a new recipe
-def create_knowledge_graph(title, ingredients, directions):
-    with driver.session() as session:
-        session.write_transaction(_create_recipe, title, ingredients, directions)
+# def create_knowledge_graph(title, ingredients, directions):
+#     with driver.session() as session:
+#         session.write_transaction(_create_recipe, title, ingredients, directions)
 
 def _create_recipe(tx, title, ingredients, directions):
     # Create recipe node

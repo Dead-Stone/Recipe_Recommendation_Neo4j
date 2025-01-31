@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 import os
 from neo4j import GraphDatabase
 
-from preprocessing import add_new_ingredient
+from preprocessing import add_new_ingredient, load_and_preprocess_data
 
 # Initialize logger
 logging.basicConfig(level=logging.DEBUG)
@@ -31,6 +31,8 @@ def get_all_ingredients():
         result = session.run("MATCH (i:Ingredient) RETURN i.name AS name")
         all_ingredients = [record["name"] for record in result]
     return sorted(all_ingredients)
+
+df, tmp_ingredients = load_and_preprocess_data()
 
 # Get all ingredients from the knowledge graph
 all_ingredients = get_all_ingredients()
@@ -134,23 +136,44 @@ def process_recipe_data(recipe_data):
         logger.error("Recipe data does not have the expected structure.")
         return "Error generating recipe. Please try again."
 
-# Function to get recipes based on selected ingredients
+# # Function to get recipes based on selected ingredients
+# def get_recipes(selected_ingredients, new_ingredient):
+#     logger.debug(f"Selected ingredients: {selected_ingredients}, New ingredient: {new_ingredient}")
+#     global all_ingredients  # Declare the variable as global
+#     if new_ingredient and new_ingredient not in all_ingredients:
+#         try:
+#             all_ingredients = add_new_ingredient(new_ingredient, all_ingredients)
+#             logger.debug(f"Ingredient list after adding: {all_ingredients}")
+#         except Exception as e:
+#             logger.error(f"Error adding new ingredient: {e}")
+#             return "Error adding new ingredient. Please try again."
+
+#     logger.debug(f"Final set of ingredients: {set(selected_ingredients)}")
+#     recipe_data = get_recipe_suggestion(list(set(selected_ingredients)))
+    
+#     return process_recipe_data(recipe_data)
 def get_recipes(selected_ingredients, new_ingredient):
     logger.debug(f"Selected ingredients: {selected_ingredients}, New ingredient: {new_ingredient}")
-    global all_ingredients  # Declare the variable as global
-    if new_ingredient and new_ingredient not in all_ingredients:
-        try:
-            all_ingredients = add_new_ingredient(new_ingredient, all_ingredients)
-            logger.debug(f"Ingredient list after adding: {all_ingredients}")
-        except Exception as e:
-            logger.error(f"Error adding new ingredient: {e}")
-            return "Error adding new ingredient. Please try again."
-
-    logger.debug(f"Final set of ingredients: {set(selected_ingredients)}")
-    recipe_data = get_recipe_suggestion(list(set(selected_ingredients)))
+    ingredients_to_use = set(selected_ingredients or [])
     
-    return process_recipe_data(recipe_data)
-
+    if new_ingredient:
+        new_ingredient = new_ingredient.strip()
+        if new_ingredient and new_ingredient not in ingredients_to_use:
+            ingredients_to_use.add(new_ingredient)
+            try:
+                all_ingredients = add_new_ingredient(new_ingredient, all_ingredients)
+            except Exception as e:
+                logger.error(f"Error adding new ingredient: {e}")
+    
+    if not ingredients_to_use:
+        return "Please select at least one ingredient"
+        
+    try:
+        recipe_data = get_recipe_suggestion(list(ingredients_to_use))
+        return process_recipe_data(recipe_data)
+    except Exception as e:
+        logger.error(f"Error generating recipe: {e}")
+        return "Error generating recipe. Please try again."
 # Gradio Interface
 with gr.Blocks() as demo:
     gr.Markdown("# Recipe Recommendation System")
@@ -172,17 +195,25 @@ with gr.Blocks() as demo:
     
     def update_ingredient_list(search_input_value):
         logger.debug(f"Search input received: {search_input_value}")
-        global all_ingredients  # Declare the variable as global
+        global all_ingredients
+        
+        if not search_input_value:
+            return gr.update(choices=all_ingredients)
+            
+        # Clean the input
+        search_input_value = search_input_value.strip()
+        print("values::::::::",search_input_value,all_ingredients)
         if search_input_value and search_input_value not in all_ingredients:
             try:
-                # Ensure ingredient is handled as a string
-                print(all_ingredients)
+                # Add new ingredient
                 all_ingredients = add_new_ingredient(search_input_value, all_ingredients)
-                logger.debug(f"Ingredient list after adding: {all_ingredients}")
-                return gr.update(choices=all_ingredients)
+                logger.debug(f"Updated ingredient list: {all_ingredients}")
+                return gr.update(choices=all_ingredients, value=[search_input_value])
             except Exception as e:
                 logger.error(f"Error updating ingredient list: {e}")
-                return gr.update(value="Error")
+                return gr.update(choices=all_ingredients)
+                
+        return gr.update(choices=all_ingredients)
 
     search_input.submit(
         update_ingredient_list, 
