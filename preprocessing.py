@@ -29,7 +29,7 @@ def parse_ingredients_list(ingredients_str):
 # Function to add a new ingredient to the knowledge graph if it doesn't exist
 def add_new_ingredient(ingredient, all_ingredients):
     if ingredient not in all_ingredients:
-        create_knowledge_graph(ingredient, [], [])
+        create_knowledge_graph([],ingredient, [])
         all_ingredients.append(ingredient)
         all_ingredients.sort()
         logger.info(f"Added new ingredient: {ingredient}")
